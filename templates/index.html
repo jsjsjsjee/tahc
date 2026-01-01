@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Chatbot</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .chat-app {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: #fafafa;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 18px;
+            border-radius: 18px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+            word-wrap: break-word;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .bot-message {
+            background: white;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border-left: 4px solid #667eea;
+        }
+        
+        .system-message {
+            background: #f8f9fa;
+            color: #666;
+            align-self: center;
+            text-align: center;
+            font-size: 0.9rem;
+            max-width: 90%;
+            border-radius: 12px;
+            padding: 12px 20px;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 8px;
+            text-align: right;
+        }
+        
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            background: white;
+            display: flex;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        
+        textarea {
+            flex: 1;
+            padding: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: none;
+            min-height: 56px;
+            max-height: 120px;
+            line-height: 1.5;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            width: 56px;
+            height: 56px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            flex-shrink: 0;
+        }
+        
+        .send-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #666;
+        }
+        
+        .loading-dots {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .loading-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        /* Scrollbar styling */
+        .messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .messages::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .messages::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .chat-app {
+                height: 95vh;
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 20px 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.6rem;
+            }
+            
+            .messages {
+                padding: 15px;
+            }
+            
+            .message {
+                max-width: 90%;
+                padding: 15px;
+            }
+            
+            .input-area {
+                padding: 15px;
+            }
+        }
+        
+        .thinking {
+            font-style: italic;
+            color: #666;
+        }
+        
+        .error-message {
+            background: #ffe6e6;
+            color: #cc0000;
+            border-left: 4px solid #cc0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-app">
+        <div class="header">
+            <h1><i class="fas fa-robot"></i> Chat Assistant</h1>
+            <p>Ask me anything.</p>
+        </div>
+        
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="message system-message" id="welcome-message">
+                    <i class="fas fa-spinner fa-spin"></i> Loading documents...
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <textarea 
+                    id="question-input" 
+                    placeholder="Ask a question about your PDFs..." 
+                    rows="1"
+                    oninput="autoResize(this)"
+                    disabled
+                ></textarea>
+                <button class="send-btn" id="send-btn" onclick="askQuestion()" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        let isProcessing = false;
+        let pdfCount = 0;
+        
+        // DOM Elements
+        const messagesDiv = document.getElementById('messages');
+        const questionInput = document.getElementById('question-input');
+        const sendBtn = document.getElementById('send-btn');
+        const welcomeMessage = document.getElementById('welcome-message');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkPDFs();
+            
+            // Enter key to send
+            questionInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!isProcessing) askQuestion();
+                }
+            });
+        });
+        
+        // Check PDFs on startup
+        async function checkPDFs() {
+            try {
+                const response = await fetch(`${API_BASE}/api/pdfs`);
+                const data = await response.json();
+                
+                pdfCount = data.count;
+                
+                if (pdfCount > 0) {
+                    welcomeMessage.innerHTML = `
+                       
+                    `;
+                    
+                    // Enable input
+                    questionInput.disabled = false;
+                    questionInput.placeholder = "Type your question here...";
+                    sendBtn.disabled = false;
+                    questionInput.focus();
+                } else {
+                    welcomeMessage.innerHTML = `
+                        📁 No PDFs found in uploads folder.<br>
+                        Please add PDF files to the 'uploads' directory.
+                    `;
+                }
+                
+            } catch (error) {
+                welcomeMessage.innerHTML = `
+                    ❌ Error connecting to server.<br>
+                    Please make sure the backend is running.
+                `;
+                console.error('Error checking PDFs:', error);
+            }
+        }
+        
+        // Ask question
+        async function askQuestion() {
+            const question = questionInput.value.trim();
+            
+            if (!question || isProcessing || pdfCount === 0) return;
+            
+            // Add user message
+            addMessage('user', question);
+            questionInput.value = '';
+            autoResize(questionInput);
+            
+            // Disable input
+            isProcessing = true;
+            questionInput.disabled = true;
+            sendBtn.disabled = true;
+            
+            // Show loading
+            const loadingId = addMessage('bot', '', true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Update message with answer
+                    updateMessage(loadingId, 'bot', data.answer);
+                    
+                } else {
+                    updateMessage(loadingId, 'bot', `❌ Error: ${data.error || 'Unable to get answer'}`);
+                }
+                
+            } catch (error) {
+                updateMessage(loadingId, 'bot', `❌ Network error: Please try again`);
+                console.error('Error:', error);
+            } finally {
+                // Re-enable input
+                isProcessing = false;
+                questionInput.disabled = false;
+                sendBtn.disabled = false;
+                questionInput.focus();
+            }
+        }
+        
+        // Chat helpers
+        function addMessage(sender, text, loading = false) {
+            const messageDiv = document.createElement('div');
+            const id = 'msg-' + Date.now();
+            messageDiv.id = id;
+            
+            if (loading) {
+                messageDiv.className = 'message bot-message';
+                messageDiv.innerHTML = `
+                    <div class="loading">
+                        <div class="loading-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        Thinking...
+                    </div>
+                `;
+            } else {
+                messageDiv.className = `message ${sender}-message`;
+                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                messageDiv.innerHTML = `
+                    <div>${escapeHtml(text)}</div>
+                    <div class="message-time">${time}</div>
+                `;
+            }
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            return id;
+        }
+        
+        function updateMessage(id, sender, text) {
+            const messageDiv = document.getElementById(id);
+            if (messageDiv) {
+                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                messageDiv.className = `message ${sender}-message`;
+                messageDiv.innerHTML = `
+                    <div>${escapeHtml(text)}</div>
+                    <div class="message-time">${time}</div>
+                `;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML.replace(/\n/g, '<br>');
+        }
+        
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+    </script>
+</body>
+</html>
