@@ -50,49 +50,74 @@ def extract_all_pdf_text():
     return all_text.strip()
 
 def query_openrouter(question, context):
-    """Query OpenRouter API with PDF context"""
-    if not context:
-        return "No PDF content found. Please add PDF files to the uploads folder."
+    """Query OpenRouter with detailed debugging"""
+    import requests
+    
+    # Get API key
+    api_key = os.environ.get('OPENROUTER_API_KEY')
+    
+    print(f"=== DEBUG QUERY ===")
+    print(f"Question: {question[:50]}...")
+    print(f"Context length: {len(context)}")
+    print(f"API Key exists: {bool(api_key)}")
+    
+    if not api_key:
+        print("ERROR: No API key!")
+        return "Error: No API key configured"
+    
+    print(f"API Key starts with: {api_key[:20]}")
+    print(f"API Key length: {len(api_key)}")
     
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://chatbot-ai-1jyr.onrender.com",
+        "X-Title": "PDF Chatbot"
     }
     
-    system_message = f"""You are a helpful assistant that answers questions based ONLY on the provided PDF documents.
-
-CONTEXT FROM PDFs:
-{context}
-
-IMPORTANT RULES:
-1. Answer based ONLY on the information in the PDFs above
-2. If the answer is not in the PDFs, say: "I cannot find this information in the documents"
-3. Do not make up information
-4. Keep answers clear and concise"""
-
+    # Simple prompt
+    prompt = f"Based on this: {context[:1000]}\n\nQuestion: {question}\nAnswer:"
+    
     data = {
         "model": "mistralai/mistral-7b-instruct:free",
-        "messages": [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": question}
-        ],
-        "temperature": 0.3,
-        "max_tokens": 500
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 200
     }
     
     try:
+        print(f"Sending request to OpenRouter...")
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=data,
             timeout=30
         )
+        
+        print(f"Response status: {response.status_code}")
+        print(f"Response headers: {dict(response.headers)}")
+        print(f"Response body: {response.text[:500]}")
+        
+        if response.status_code == 401:
+            # Try to get more info
+            try:
+                error_data = response.json()
+                print(f"Error details: {error_data}")
+            except:
+                pass
+            
+            return "Error 401: Unauthorized. The API key is invalid or expired."
+        
         response.raise_for_status()
+        
         result = response.json()
         return result["choices"][0]["message"]["content"]
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Request exception: {e}")
+        return f"Network error: {str(e)}"
     except Exception as e:
-        print(f"OpenRouter API error: {e}")
-        return f"I apologize, but I encountered an error while processing your request. Please try again."
+        print(f"General exception: {e}")
+        return f"Error: {str(e)}"
 
 @app.route('/')
 def home():
@@ -128,6 +153,78 @@ def ask_question():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/debug-env')
+def debug_env():
+    """Show all environment variables (hide values)"""
+    env_vars = {}
+    for key, value in os.environ.items():
+        if 'key' in key.lower() or 'api' in key.lower() or 'secret' in key.lower():
+            # Show first/last few chars of sensitive values
+            if value:
+                env_vars[key] = f"{value[:5]}...{value[-5:]}" if len(value) > 10 else "***"
+            else:
+                env_vars[key] = "EMPTY"
+        else:
+            env_vars[key] = "***"
+    
+    # Check PDFs
+    pdfs = get_all_pdfs()
+    
+    return jsonify({
+        "environment_variables": env_vars,
+        "pdf_count": len(pdfs),
+        "pdf_files": [os.path.basename(p) for p in pdfs],
+        "app_running": True
+    })
+
+@app.route('/api/test-openrouter-simple')
+def test_openrouter_simple():
+    """Very simple OpenRouter test"""
+    import requests
+    
+    # Get key from environment
+    api_key = os.environ.get('OPENROUTER_API_KEY')
+    
+    if not api_key:
+        return jsonify({"error": "No API key in environment"})
+    
+    # Print in logs
+    print(f"Testing key: {api_key[:20]}...")
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    # Very simple request
+    data = {
+        "model": "mistralai/mistral-7b-instruct:free",
+        "messages": [{"role": "user", "content": "Say hi"}],
+        "max_tokens": 5
+    }
+    
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=data,
+            timeout=10
+        )
+        
+        return jsonify({
+            "status_code": response.status_code,
+            "response_preview": response.text[:200],
+            "headers_sent": {
+                "authorization": f"Bearer {api_key[:10]}...",
+                "content_type": "application/json"
+            },
+            "key_length": len(api_key),
+            "key_starts_with": api_key[:10]
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route('/api/pdfs')
 def list_pdfs():
